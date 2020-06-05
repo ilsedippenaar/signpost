@@ -1,0 +1,24 @@
+[tool.poetry]
+name = "signpost"
+version = "0.1.0"
+description = "Simple decorators and functions for type checking pandas DataFrames at runtime"
+license = "GPL-3.0-only"
+authors = ["Ilse Dippenaar <ilsedipp@gmail.com>"]
+readme = "README.rst"
+
+[tool.poetry.dependencies]
+python = "^3.6"
+pandas = "^1.0.1"
+numpy = "^1.18.1"
+
+[tool.poetry.dev-dependencies]
+pytest = "^5.2"
+mypy = "^0.770"
+black = "^19.10b0"
+ipykernel = "^5.2.0"
+pytest-cov = "^2.8.1"
+isort = "^4.3.21"
+
+[build-system]
+requires = ["poetry>=0.12"]
+build-backend = "poetry.masonry.api"

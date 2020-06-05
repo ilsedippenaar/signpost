@@ -1,0 +1,7 @@
+* text=auto
+
+*.py text diff=python
+*.toml text
+*.yaml text
+*.ini text
+*.rst text
