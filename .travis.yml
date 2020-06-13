@@ -1,0 +1,37 @@
+language: python
+dist: xenial
+python: "3.6"
+
+cache:
+  pip: true
+  directories:
+    - "$HOME/.cache/pre-commit"
+
+stages:
+  - quality
+  - test
+
+jobs:
+  fast_finish: true
+  include:
+    - stage: quality
+      install:
+        - pip install pre-commit
+        - pre-commit install-hooks
+      script:
+        - pre-commit run --all-files
+    # no matrix support in stages, so we can just
+    # use YAML anchors instead travis-ci/travis-ci#8295
+    - &tests
+      stage: test
+      python: "3.6"
+      install:
+        - pip install --upgrade pip
+        - pip install poetry
+        - poetry install -v
+      script:
+        - pytest --cov=src
+    - <<: *tests
+      python: "3.7"
+    - <<: *tests
+      python: "3.8"

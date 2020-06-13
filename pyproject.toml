@@ -2,12 +2,13 @@
 name = "signpost"
 version = "0.1.0"
 description = "Simple decorators and functions for type checking pandas DataFrames at runtime"
+repository = "https://github.com/ilsedippenaar/signpost"
 license = "GPL-3.0-only"
 authors = ["Ilse Dippenaar <ilsedipp@gmail.com>"]
 readme = "README.rst"
 
 [tool.poetry.dependencies]
-python = "^3.6"
+python = "^3.6.1"
 pandas = "^1.0.1"
 numpy = "^1.18.1"
 
