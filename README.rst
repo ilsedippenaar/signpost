@@ -1,6 +1,8 @@
 signpost
 ========
 
+|pypi-version| |pypi-python-versions| |build-status| |coverage|
+
 This is a simple library for annotating and enforcing properties of
 pandas DataFrames at runtime. By showing which columns and types
 are expected before execution of a function begins, we can catch errors
@@ -92,3 +94,19 @@ There are a couple of improvements to be made, namely
 1. **Ergonomics.** Assume bare types to be single-element lists.
 
 2. **Documentation.**
+
+.. |pypi-version| image:: https://img.shields.io/pypi/v/signpost
+    :alt: PyPI
+    :target: https://pypi.org/project/signpost
+
+.. |pypi-python-versions| image:: https://img.shields.io/pypi/pyversions/signpost
+    :alt: PyPI - Python Version
+    :target: https://pypi.org/project/signpost
+
+.. |build-status| image:: https://travis-ci.com/ilsedippenaar/signpost.svg?branch=master
+    :alt: Build Status
+    :target: https://travis-ci.com/ilsedippenaar/signpost
+
+.. |coverage| image:: https://codecov.io/gh/ilsedippenaar/signpost/branch/master/graph/badge.svg
+    :alt: Code Coverage
+    :target: https://codecov.io/gh/ilsedippenaar/signpost
