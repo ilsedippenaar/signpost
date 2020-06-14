@@ -6,6 +6,13 @@ repository = "https://github.com/ilsedippenaar/signpost"
 license = "GPL-3.0-only"
 authors = ["Ilse Dippenaar <ilsedipp@gmail.com>"]
 readme = "README.rst"
+homepage = "https://github.com/ilsedippenaar/signpost"
+keywords = ["pandas", "verification", "types", "annotate"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Topic :: Scientific/Engineering",
+    "Typing :: Typed",
+]
 
 [tool.poetry.dependencies]
 python = "^3.6.1"
