@@ -1,4 +1,5 @@
-from typing import Any, Callable, Collection, Dict, Optional, Union
+import functools
+from typing import Any, Callable, Collection, Dict, Optional, Union, cast
 
 import pandas as pd
 import pytest
@@ -32,6 +33,7 @@ def test_function(
         ([Cols("all", ["c"]), Schema("all", {"a": int})], False),
         ([Cols("all", ["a"]), Schema("all", {"a": float})], False),
         ([Cols("all", ["a"]), Schema("all", {"a": int})], True),
+        ([Cols.Checker("all", ["a"]), Schema.Checker("all", {"a": int})], True),
         ([Cols("any", ["a"])], True),
         ([], True),
     ],
@@ -41,7 +43,12 @@ def test_and(
     properties: Collection[Union[props.Property, props.ContextProperty]],
     expected: bool,
 ) -> None:
-    assert (And(*properties).check_with_context(basic_df, {}) is None) == expected
+    result = And(*properties).check_with_context(basic_df, {})
+    assert (result is None) == expected
+    if properties:
+        # type checker isn't smart enough to realize this produces an And object
+        prop = cast(And, functools.reduce(lambda x, y: x & y, properties))
+        assert prop.check_with_context(basic_df, {}) == result
 
 
 @pytest.mark.parametrize(
@@ -51,6 +58,7 @@ def test_and(
         ([Cols("all", ["c"]), Schema("all", {"a": int})], True),
         ([Cols("all", ["a"]), Schema("all", {"a": float})], True),
         ([Cols("all", ["a"]), Schema("all", {"a": int})], True),
+        ([Cols.Checker("all", ["a"]), Schema.Checker("all", {"a": int})], True),
         ([Cols("any", ["a"])], True),
         ([], False),
     ],
@@ -60,7 +68,11 @@ def test_or(
     properties: Collection[Union[props.Property, props.ContextProperty]],
     expected: bool,
 ) -> None:
-    assert (Or(*properties).check_with_context(basic_df, {}) is None) == expected
+    result = Or(*properties).check_with_context(basic_df, {})
+    assert (result is None) == expected
+    if properties:
+        prop = cast(Or, functools.reduce(lambda x, y: x | y, properties))
+        assert prop.check_with_context(basic_df, {}) == result
 
 
 @pytest.mark.parametrize(

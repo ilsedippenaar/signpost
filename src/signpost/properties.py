@@ -43,6 +43,16 @@ class Property:
     def check(self, df: pd.DataFrame) -> Optional[str]:
         raise NotImplementedError
 
+    def __and__(self, other: object) -> "And":
+        if not isinstance(other, (Property, ContextProperty)):
+            raise TypeError(f"And operation not supported between {self} and {other}")
+        return And(self, other)
+
+    def __or__(self, other: object) -> "Or":
+        if not isinstance(other, (Property, ContextProperty)):
+            raise TypeError(f"Or operation not supported between {self} and {other}")
+        return Or(self, other)
+
 
 class ContextProperty:
     """
@@ -55,6 +65,16 @@ class ContextProperty:
         self, df: pd.DataFrame, context: Dict[str, Any]
     ) -> Optional[str]:
         raise NotImplementedError
+
+    def __and__(self, other: object) -> "And":
+        if not isinstance(other, (Property, ContextProperty)):
+            raise TypeError(f"And operation not supported between {self} and {other}")
+        return And(self, other)
+
+    def __or__(self, other: object) -> "Or":
+        if not isinstance(other, (Property, ContextProperty)):
+            raise TypeError(f"Or operation not supported between {self} and {other}")
+        return Or(self, other)
 
 
 class Meta(Generic[T]):
