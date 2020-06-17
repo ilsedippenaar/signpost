@@ -1,4 +1,4 @@
-from typing import Any, Callable, Collection, Dict, Optional
+from typing import Any, Callable, Collection, Dict, Optional, Union
 
 import pandas as pd
 import pytest
@@ -37,7 +37,9 @@ def test_function(
     ],
 )
 def test_and(
-    basic_df: pd.DataFrame, properties: Collection[props.Property], expected: bool,
+    basic_df: pd.DataFrame,
+    properties: Collection[Union[props.Property, props.ContextProperty]],
+    expected: bool,
 ) -> None:
     assert (And(*properties).check_with_context(basic_df, {}) is None) == expected
 
@@ -54,7 +56,9 @@ def test_and(
     ],
 )
 def test_or(
-    basic_df: pd.DataFrame, properties: Collection[props.Property], expected: bool,
+    basic_df: pd.DataFrame,
+    properties: Collection[Union[props.Property, props.ContextProperty]],
+    expected: bool,
 ) -> None:
     assert (Or(*properties).check_with_context(basic_df, {}) is None) == expected
 
