@@ -21,9 +21,11 @@ from typing import (
 import pandas as pd
 from pandas.core.dtypes import common
 
+from signpost import utils
+
 S = TypeVar("S")
 T = TypeVar("T")
-ColsType = Collection[Hashable]
+ColsType = utils.Wrappable[Hashable]
 SchemaType = Mapping[Hashable, Type[Any]]
 
 
@@ -113,6 +115,7 @@ class QualifierMixin:
     def _eval_condition(self, df: pd.DataFrame) -> Set[str]:
         left, right = self._get_compare_dfs(df)
         indicator_col = str(uuid.uuid5(uuid.NAMESPACE_URL, "signpost"))
+        # noinspection PyTypeChecker
         result = (
             pd.merge(left, right, how="outer", indicator=indicator_col)
             .loc[:, indicator_col]
@@ -148,7 +151,7 @@ class Cols(ContextProperty):
     class Checker(Property, QualifierMixin):
         def __init__(self, qualifier: Union[str, Qualifier], cols: ColsType):
             self.qualifier = Qualifier(qualifier)
-            self.cols = list(cols)
+            self.cols = utils.wrap(cols)
 
         def _get_compare_dfs(
             self, df: pd.DataFrame
@@ -167,7 +170,7 @@ class Cols(ContextProperty):
         self, qualifier: MetaVar[Union[str, Qualifier]], cols: MetaVar[ColsType]
     ):
         self.qualifier = Param(qualifier, Qualifier)
-        self.cols = Param(cols, lambda x: list(x))
+        self.cols = Param(cols, lambda x: utils.wrap(x))
 
     def check_with_context(
         self, df: pd.DataFrame, context: Dict[str, Any]
@@ -273,8 +276,8 @@ class Values(ContextProperty):
 class Superkey(ContextProperty):
     class Checker(Property):
         def __init__(self, cols: ColsType, over: Optional[ColsType] = None):
-            self.cols = list(cols)
-            self.over = list(over) if over is not None else None
+            self.cols = utils.wrap(cols)
+            self.over = utils.wrap(over) if over is not None else None
 
         def _get_duplicated(self, df: pd.DataFrame) -> pd.DataFrame:
             if not self.cols:
@@ -302,8 +305,8 @@ class Superkey(ContextProperty):
     def __init__(
         self, cols: MetaVar[ColsType], over: MetaVar[Optional[ColsType]] = None
     ):
-        self.cols = Param(cols, lambda x: list(x))
-        self.over = Param(over, lambda x: list(x) if x is not None else None)
+        self.cols = Param(cols, lambda x: utils.wrap(x))
+        self.over = Param(over, lambda x: utils.wrap(x) if x is not None else None)
 
     def check_with_context(
         self, df: pd.DataFrame, context: Dict[str, Any]

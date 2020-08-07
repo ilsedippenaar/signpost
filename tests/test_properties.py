@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 from _pytest.fixtures import SubRequest
 
-from signpost import Cols, Meta, Schema, Superkey, Values
+from signpost import Cols, Schema, Superkey, Values
 from signpost import properties as props
 
 
@@ -53,21 +53,21 @@ def df(request: SubRequest) -> pd.DataFrame:
 @pytest.mark.parametrize(
     "qualifier, cols, expected",
     [
-        ("all", ["a"], True),
+        ("all", "a", True),
         ("all", ["a", "b"], True),
         ("all", ["a", "b", "c"], False),
         ("all", [], True),
-        ("any", ["a"], True),
+        ("any", "a", True),
         ("any", ["a", "b"], True),
         ("any", ["a", "b", "c"], True),
         ("any", [], False),
-        ("none", ["c"], True),
+        ("none", "c", True),
         ("none", ["c", "d"], True),
         ("none", ["a", "c"], False),
         ("none", [], True),
         ("just", ["a", "b"], True),
-        ("just", ["a"], False),
-        ("just", ["b"], False),
+        ("just", "a", False),
+        ("just", "b", False),
         ("just", [], False),
     ],
 )
@@ -202,23 +202,23 @@ def test_values(
 @pytest.mark.parametrize(
     "cols, over, expected",
     [
-        (["a"], None, True),
-        (["b"], None, False),
-        (["d"], None, True),  # NaNs are counted as values
-        (["e"], None, False),  # duplicate NaNs are counted as duplicates
-        (["a"], ["b"], True),
-        (["a"], ["b", "c"], True),
-        (["b"], ["c"], True),
-        (["b"], ["a"], False),
-        (["b"], ["e"], False),
-        (["b"], ["c", "e"], False),
-        (["c"], ["b"], True),  # reverse of b and c above
-        (["d"], ["a"], True),  # NaNs can be keys
+        ("a", None, True),
+        ("b", None, False),
+        ("d", None, True),  # NaNs are counted as values
+        ("e", None, False),  # duplicate NaNs are counted as duplicates
+        ("a", "b", True),
+        ("a", ["b", "c"], True),
+        ("b", "c", True),
+        ("b", "a", False),
+        ("b", "e", False),
+        ("b", ["c", "e"], False),
+        ("c", "b", True),  # reverse of b and c above
+        ("d", "a", True),  # NaNs can be keys
         ([], None, False),  # empty list is not a superkey
         # missing columns
-        (["z"], [], False),
-        (["a"], ["z"], False),
-        (["x"], ["y", "z"], False),
+        ("z", [], False),
+        ("a", "z", False),
+        ("x", ["y", "z"], False),
     ],
 )
 def test_superkey(
