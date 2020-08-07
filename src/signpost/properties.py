@@ -314,6 +314,23 @@ class Superkey(ContextProperty):
         return self.Checker(self.cols.get(context), self.over.get(context)).check(df)
 
 
+class Assume(ContextProperty):
+    """
+    Wraps a ContextProperty or Property to treat it as always true.
+
+    In order to document a property that we know to be true but may be
+    expensive to compute, we can use the Assume property
+    """
+
+    def __init__(self, inner: Union[ContextProperty, Property]):
+        self.inner = inner
+
+    def check_with_context(
+        self, df: pd.DataFrame, context: Dict[str, Any]
+    ) -> Optional[str]:
+        return None
+
+
 class Function(ContextProperty):
     def __init__(
         self, function: Callable[[pd.DataFrame, Dict[str, Any]], Optional[str]]

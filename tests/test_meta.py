@@ -4,7 +4,17 @@ from typing import Any, Callable, Collection, Dict, Optional, Union, cast
 import pandas as pd
 import pytest
 
-from signpost import And, Cols, Function, Meta, Or, Schema, Superkey, Values
+from signpost import (
+    And,
+    Assume,
+    Cols,
+    Function,
+    Meta,
+    Or,
+    Schema,
+    Superkey,
+    Values,
+)
 from signpost import properties as props
 
 
@@ -151,3 +161,10 @@ def test_superkey(
 
 def test_superkey_default_over(basic_df: pd.DataFrame) -> None:
     assert Superkey(Meta("cols")).check_with_context(basic_df, {"cols": ["a"]}) is None
+
+
+@pytest.mark.parametrize("prop", [Cols("all", "a"), Cols("all", "not_a_column")])
+def test_assume(
+    basic_df: pd.DataFrame, prop: Union[props.Property, props.ContextProperty],
+) -> None:
+    assert Assume(prop).check_with_context(basic_df, {}) is None
