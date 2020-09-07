@@ -11,7 +11,6 @@ from typing import (
     Mapping,
     Optional,
     Set,
-    Tuple,
     Type,
     TypeVar,
     Union,
@@ -108,58 +107,59 @@ class Param(Generic[S, T]):
         return self.val
 
 
-class QualifierMixin:
-    def _get_compare_dfs(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]:
-        raise NotImplementedError
+class QualifierEvaluator:
+    def __init__(
+        self, qualifier: Qualifier, reference: pd.DataFrame, comparison: pd.DataFrame
+    ):
+        self.qualifier = qualifier
+        self.reference = reference
+        self.comparison = comparison
 
-    def _eval_condition(self, df: pd.DataFrame) -> Set[str]:
-        left, right = self._get_compare_dfs(df)
+    def _get_overlap_parts(self) -> Set[str]:
         indicator_col = str(uuid.uuid5(uuid.NAMESPACE_URL, "signpost"))
-        # noinspection PyTypeChecker
         result = (
-            pd.merge(left, right, how="outer", indicator=indicator_col)
+            pd.merge(
+                self.reference, self.comparison, how="outer", indicator=indicator_col
+            )
             .loc[:, indicator_col]
             .drop_duplicates()
             .pipe(set)
         )
         return cast(Set[str], result)
 
-    def _has_all(self, df: pd.DataFrame) -> bool:
-        return "right_only" not in self._eval_condition(df)
+    def _has_all(self) -> bool:
+        return "right_only" not in self._get_overlap_parts()
 
-    def _has_any(self, df: pd.DataFrame) -> bool:
-        return "both" in self._eval_condition(df)
+    def _has_any(self) -> bool:
+        return "both" in self._get_overlap_parts()
 
-    def _has_none(self, df: pd.DataFrame) -> bool:
-        return not self._has_any(df)
+    def _has_none(self) -> bool:
+        return not self._has_any()
 
-    def _has_just(self, df: pd.DataFrame) -> bool:
-        return self._eval_condition(df) == {"both"}
+    def _has_just(self) -> bool:
+        return self._get_overlap_parts() == {"both"}
 
-    def _get_qualified_eval_func(
-        self, qualifier: Qualifier
-    ) -> Callable[[pd.DataFrame], bool]:
+    def eval(self) -> bool:
         return {
             Qualifier.ALL: self._has_all,
             Qualifier.ANY: self._has_any,
             Qualifier.NONE: self._has_none,
             Qualifier.JUST: self._has_just,
-        }[qualifier]
+        }[self.qualifier]()
 
 
 class Cols(ContextProperty):
-    class Checker(Property, QualifierMixin):
+    class Checker(Property):
         def __init__(self, qualifier: Union[str, Qualifier], cols: ColsType):
             self.qualifier = Qualifier(qualifier)
             self.cols = utils.wrap(cols)
 
-        def _get_compare_dfs(
-            self, df: pd.DataFrame
-        ) -> Tuple[pd.DataFrame, pd.DataFrame]:
-            return pd.DataFrame({"col": list(df)}), pd.DataFrame({"col": self.cols})
-
         def _raw_check(self, df: pd.DataFrame) -> bool:
-            return self._get_qualified_eval_func(self.qualifier)(df)
+            return QualifierEvaluator(
+                self.qualifier,
+                reference=pd.DataFrame({"col": list(df)}),
+                comparison=pd.DataFrame({"col": self.cols}),
+            ).eval()
 
         def check(self, df: pd.DataFrame) -> Optional[str]:
             if not self._raw_check(df):
@@ -181,7 +181,7 @@ class Cols(ContextProperty):
 
 
 class Schema(ContextProperty):
-    class Checker(Property, QualifierMixin):
+    class Checker(Property):
         def __init__(self, qualifier: Union[str, Qualifier], schema: SchemaType):
             self.qualifier = Qualifier(qualifier)
             self.schema = schema
@@ -192,16 +192,12 @@ class Schema(ContextProperty):
                 dtype=lambda d: d["dtype"].map(common.pandas_dtype)
             )
 
-        def _get_compare_dfs(
-            self, df: pd.DataFrame
-        ) -> Tuple[pd.DataFrame, pd.DataFrame]:
-            return (
-                self.make_types_df(cast(SchemaType, df.dtypes.to_dict())),
-                self.make_types_df(self.schema),
-            )
-
         def _raw_check(self, df: pd.DataFrame) -> bool:
-            return self._get_qualified_eval_func(self.qualifier)(df)
+            return QualifierEvaluator(
+                self.qualifier,
+                reference=self.make_types_df(cast(SchemaType, df.dtypes.to_dict())),
+                comparison=self.make_types_df(self.schema),
+            ).eval()
 
         def check(self, df: pd.DataFrame) -> Optional[str]:
             if not self._raw_check(df):
@@ -223,7 +219,7 @@ class Schema(ContextProperty):
 
 
 class Values(ContextProperty):
-    class Checker(Property, QualifierMixin):
+    class Checker(Property):
         def __init__(
             self,
             qualifier: Union[str, Qualifier],
@@ -232,18 +228,16 @@ class Values(ContextProperty):
             self.qualifier = Qualifier(qualifier)
             self.values = values
 
-        def _get_compare_dfs(
-            self, df: pd.DataFrame
-        ) -> Tuple[pd.DataFrame, pd.DataFrame]:
-            return (
-                df.loc[:, self.values].drop_duplicates(),
-                pd.DataFrame(self.values)
-                .astype(df.dtypes[self.values])
-                .drop_duplicates(),
-            )
-
         def _raw_check(self, df: pd.DataFrame) -> bool:
-            return self._get_qualified_eval_func(self.qualifier)(df)
+            return QualifierEvaluator(
+                self.qualifier,
+                reference=df.loc[:, self.values].drop_duplicates(),
+                comparison=(
+                    pd.DataFrame(self.values)
+                    .astype(df.dtypes[self.values])
+                    .drop_duplicates()
+                ),
+            ).eval()
 
         def check(self, df: pd.DataFrame) -> Optional[str]:
             col_check = Cols.Checker("all", list(self.values)).check(df)
