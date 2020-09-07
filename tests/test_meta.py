@@ -7,6 +7,7 @@ import pytest
 from signpost import (
     And,
     Assume,
+    Bounded,
     Cols,
     Function,
     MergeResult,
@@ -203,5 +204,28 @@ def test_merge_result_default_indicator_col() -> None:
         MergeResult(Meta("results")).check_with_context(
             pd.DataFrame({"_merge": ["both"]}), {"results": ["both"]},
         )
+        is None
+    )
+
+
+@pytest.mark.parametrize(
+    "col_expr, lower_expr, upper_expr, closed_expr, context",
+    [
+        ("col", "1", "4", "'both'", {"col": "a"}),
+        ("col", "lower", "4", "'right'", {"col": "a", "lower": None}),
+    ],
+)
+def test_bounded(
+    basic_df: pd.DataFrame,
+    col_expr: str,
+    lower_expr: str,
+    upper_expr: str,
+    closed_expr: str,
+    context: Dict[str, Any],
+) -> None:
+    assert (
+        Bounded(
+            Meta(col_expr), Meta(lower_expr), Meta(upper_expr), Meta(closed_expr)
+        ).check_with_context(basic_df, context=context)
         is None
     )

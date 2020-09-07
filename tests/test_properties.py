@@ -6,7 +6,15 @@ import pandas as pd
 import pytest
 from _pytest.fixtures import SubRequest
 
-from signpost import Cols, MergeResult, Notna, Schema, Superkey, Values
+from signpost import (
+    Bounded,
+    Cols,
+    MergeResult,
+    Notna,
+    Schema,
+    Superkey,
+    Values,
+)
 from signpost import properties as props
 
 
@@ -318,4 +326,67 @@ def test_merge_result(
             pd.merge(left_df, right_df, how=merge_how, indicator=indicator_col)
         )
         is None
+    ) == expected
+
+
+@pytest.mark.parametrize(
+    "cols, lower, upper, closed, expected",
+    [
+        ("a", 0, 4, "both", True),
+        ("a", 1, 4, "both", True),
+        ("a", 1, 3, "both", True),
+        ("a", 1, 3, "left", False),
+        ("a", 1, 3, "right", False),
+        ("a", 1, 3, "neither", False),
+        ("b", "x", "z", "both", True),
+        (["a", "g"], 0, 4, "neither", True),
+        # NA is treated as False
+        ("e", -100, 100, "both", False),
+        (["a", "e"], -100, 100, "both", False),
+        # unbounded
+        ("a", None, 4, "right", True),
+        ("a", 0, None, "left", True),
+        ("a", None, None, "neither", True),
+        # NA not checked in double unbounded case
+        (["a", "e"], None, None, "neither", True),
+        # missing columns
+        (["a", "foobar"], 0, 4, "both", False),
+        # malformed interval
+        pytest.param(
+            "a",
+            4,
+            3,
+            "both",
+            True,
+            marks=pytest.mark.xfail(raises=ValueError, strict=True),
+        ),
+        # bounded constraints
+        pytest.param(
+            "a",
+            None,
+            3,
+            "both",
+            True,
+            marks=pytest.mark.xfail(raises=ValueError, strict=True),
+        ),
+        pytest.param(
+            "a",
+            1,
+            None,
+            "right",
+            True,
+            marks=pytest.mark.xfail(raises=ValueError, strict=True),
+        ),
+    ],
+)
+def test_bounded(
+    types_df: pd.DataFrame,
+    cols: props.ColsType,
+    lower: Any,
+    upper: Any,
+    closed: str,
+    expected: bool,
+) -> None:
+    assert (
+        Bounded.Checker(cols, lower, upper, closed,).check(types_df) is None
     ) == expected

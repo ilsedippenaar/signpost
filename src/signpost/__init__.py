@@ -2,6 +2,7 @@ from .decorators import df_args, df_return
 from .properties import (
     And,
     Assume,
+    Bounded,
     Cols,
     Function,
     MergeResult,
@@ -23,6 +24,7 @@ __all__ = [
     "Assume",
     "Notna",
     "MergeResult",
+    "Bounded",
     "Function",
     "And",
     "Or",

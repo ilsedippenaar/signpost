@@ -18,6 +18,7 @@ from typing import (
     cast,
 )
 
+import numpy as np
 import pandas as pd
 from pandas.core.dtypes import common
 
@@ -414,6 +415,116 @@ class MergeResult(ContextProperty):
     ) -> Optional[str]:
         return self.Checker(
             merge_results=self.results.get(context), indicator_col=self.col.get(context)
+        ).check(df)
+
+
+class Bounded(ContextProperty):
+    @unique
+    class Closed(Enum):
+        BOTH = "both"
+        LEFT = "left"
+        RIGHT = "right"
+        NEITHER = "neither"
+
+        @property
+        def closed_left(self) -> bool:
+            return self in {self.BOTH, self.LEFT}
+
+        @property
+        def closed_right(self) -> bool:
+            return self in {self.BOTH, self.RIGHT}
+
+    class Checker(Property):
+        def __init__(
+            self,
+            cols: ColsType,
+            lower: Optional[Any],
+            upper: Optional[Any],
+            closed: Union[str, "Bounded.Closed"],
+        ):
+            self.cols = utils.wrap(cols)
+            self.lower = lower
+            self.upper = upper
+            if (
+                self.lower is not None
+                and self.upper is not None
+                and self.upper < self.lower
+            ):
+                raise ValueError(
+                    f"The upper bound {self.upper} must be greater than the lower bound {self.lower}"
+                )
+            self.closed = Bounded.Closed(closed)
+            if self.lower is None and self.closed.closed_left:
+                raise ValueError("An interval cannot be left-closed and left-unbounded")
+            if self.upper is None and self.closed.closed_right:
+                raise ValueError(
+                    "An interval cannot be right-closed and right-unbounded"
+                )
+
+        def _format_bounds(self) -> str:
+            lower = "-inf" if self.lower is None else str(self.lower)
+            upper = "inf" if self.upper is None else str(self.upper)
+            lower_bracket = "[" if self.closed.closed_left else "("
+            upper_bracket = "]" if self.closed.closed_right else ")"
+            return f"{lower_bracket}{lower}, {upper}{upper_bracket}"
+
+        def _check_lower(self, value_df: pd.DataFrame) -> pd.Series:
+            if self.lower is not None:
+                # noinspection PyUnresolvedReferences
+                return (
+                    value_df >= self.lower
+                    if self.closed.closed_left
+                    else value_df > self.lower
+                ).all(axis="columns")
+            else:
+                return pd.Series(np.full(len(value_df), True))
+
+        def _check_upper(self, value_df: pd.DataFrame) -> pd.Series:
+            if self.upper is not None:
+                # noinspection PyUnresolvedReferences
+                return (
+                    value_df <= self.upper
+                    if self.closed.closed_right
+                    else value_df < self.upper
+                ).all(axis="columns")
+            else:
+                return pd.Series(np.full(len(value_df), True))
+
+        def check(self, df: pd.DataFrame) -> Optional[str]:
+            col_check = Cols.Checker("all", self.cols).check(df)
+            if col_check is not None:
+                return col_check
+
+            value_df = df.loc[:, self.cols]
+            valid = self._check_lower(value_df) & self._check_upper(value_df)
+            if not valid.all():
+                return (
+                    f"Some observations for {self.cols} fall outside the bounds {self._format_bounds()}:\n"
+                    f"{df.loc[~valid, :]}"
+                )
+            else:
+                return None
+
+    def __init__(
+        self,
+        cols: MetaVar[ColsType],
+        lower: MetaVar[Optional[Any]],
+        upper: MetaVar[Optional[Any]],
+        closed: MetaVar["Bounded.Closed"],
+    ):
+        self.cols = Param(cols, lambda x: utils.wrap(x))
+        self.lower: Param[Optional[Any], Optional[Any]] = Param(lower, lambda x: x)
+        self.upper: Param[Optional[Any], Optional[Any]] = Param(upper, lambda x: x)
+        self.closed = Param(closed, lambda x: Bounded.Closed(x))
+
+    def check_with_context(
+        self, df: pd.DataFrame, context: Dict[str, Any]
+    ) -> Optional[str]:
+        return self.Checker(
+            cols=self.cols.get(context),
+            lower=self.lower.get(context),
+            upper=self.upper.get(context),
+            closed=self.closed.get(context),
         ).check(df)
 
 
