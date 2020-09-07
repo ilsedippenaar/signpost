@@ -325,6 +325,68 @@ class Assume(ContextProperty):
         return None
 
 
+class Notna(ContextProperty):
+    class Checker(Property):
+        def __init__(self, qualifier: Union[str, Qualifier], cols: ColsType):
+            self.qualifier = Qualifier(qualifier)
+            self.cols = utils.wrap(cols)
+
+        def _get_error_string(
+            self,
+            df: pd.DataFrame,
+            notna: pd.DataFrame,
+            notna_cols: Collection[Hashable],
+        ) -> str:
+            if self.qualifier == Qualifier.NONE:
+                # this is a double negative sort of case
+                return (
+                    f"Expected NA values in these columns:\n{self.cols}\n"
+                    f"But only these columns contain NA:\n{list(set(df) - set(notna_cols))}"
+                )
+            else:
+                human_readable = {
+                    Qualifier.ANY: "at least one of",
+                    Qualifier.ALL: "all of",
+                    Qualifier.JUST: "just",
+                }[self.qualifier]
+                return (
+                    f"Expected no NA values in {human_readable} these columns:\n{self.cols}\n"
+                    f"But only these columns are not NA:\n{notna_cols}\n"
+                    "These rows contain NA values:\n"
+                    f"{df.loc[~notna.loc[:, self.cols].all(axis='columns'), :]}"
+                )
+
+        def check(self, df: pd.DataFrame) -> Optional[str]:
+            col_check = Cols.Checker("all", self.cols).check(df)
+            if col_check is not None:
+                return col_check
+
+            notna = df.notna()
+            evaluator = QualifierEvaluator(
+                self.qualifier,
+                reference=pd.DataFrame({"col": notna.all().loc[lambda s: s].index}),
+                comparison=pd.DataFrame({"col": self.cols}),
+            )
+            return (
+                self._get_error_string(df, notna, evaluator.reference["col"].tolist())
+                if not evaluator.eval()
+                else None
+            )
+
+    def __init__(
+        self, qualifier: MetaVar[Union[str, Qualifier]], cols: MetaVar[ColsType]
+    ):
+        self.qualifier = Param(qualifier, Qualifier)
+        self.cols = Param(cols, lambda x: utils.wrap(x))
+
+    def check_with_context(
+        self, df: pd.DataFrame, context: Dict[str, Any]
+    ) -> Optional[str]:
+        return self.Checker(self.qualifier.get(context), self.cols.get(context)).check(
+            df
+        )
+
+
 class Function(ContextProperty):
     def __init__(
         self, function: Callable[[pd.DataFrame, Dict[str, Any]], Optional[str]]

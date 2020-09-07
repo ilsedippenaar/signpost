@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 from _pytest.fixtures import SubRequest
 
-from signpost import Cols, Schema, Superkey, Values
+from signpost import Cols, Notna, Schema, Superkey, Values
 from signpost import properties as props
 
 
@@ -228,3 +228,35 @@ def test_superkey(
     expected: bool,
 ) -> None:
     assert (Superkey.Checker(cols, over=over).check(keys_df) is None) == expected
+
+
+@pytest.mark.parametrize(
+    "df, qualifier, cols, expected",
+    [
+        ("types_df", "all", "a", True),
+        ("types_df", "all", "c", False),
+        ("types_df", "all", ["a", "b", "g"], True),
+        ("types_df", "all", ["a", "c"], False),
+        ("types_df", "all", ["a", "z"], False),
+        ("types_df", "any", "a", True),
+        ("types_df", "any", "c", False),
+        ("types_df", "any", ["a", "b", "g"], True),
+        ("types_df", "any", ["a", "c"], True),
+        ("types_df", "any", ["a", "z"], False),
+        ("types_df", "just", "a", False),
+        ("types_df", "just", "c", False),
+        ("types_df", "just", ["a", "b", "g"], True),
+        ("types_df", "just", ["a", "c"], False),
+        ("types_df", "just", ["a", "z"], False),
+        ("types_df", "none", "a", False),
+        ("types_df", "none", "c", True),
+        ("types_df", "none", ["a", "b", "g"], False),
+        ("types_df", "none", ["a", "c"], False),
+        ("types_df", "none", ["a", "z"], False),
+    ],
+    indirect=["df"],
+)
+def test_notna(
+    df: pd.DataFrame, qualifier: str, cols: props.ColsType, expected: bool
+) -> None:
+    assert (Notna.Checker(qualifier, cols).check(df) is None) == expected

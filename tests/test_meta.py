@@ -10,6 +10,7 @@ from signpost import (
     Cols,
     Function,
     Meta,
+    Notna,
     Or,
     Schema,
     Superkey,
@@ -107,7 +108,7 @@ def test_cols(
 
 @pytest.mark.parametrize(
     "qualifier,values_expr,context,expected",
-    [("all", "{c: [1] for c in cols}", {"cols": ["a"]}, True),],
+    [("all", "{c: [1] for c in cols}", {"cols": ["a"]}, True)],
 )
 def test_values(
     basic_df: pd.DataFrame,
@@ -124,7 +125,7 @@ def test_values(
 
 @pytest.mark.parametrize(
     "qualifier,schema_expr,context,expected",
-    [("all", "{c: int for c in cols}", {"cols": ["a"]}, True),],
+    [("all", "{c: int for c in cols}", {"cols": ["a"]}, True)],
 )
 def test_schema(
     basic_df: pd.DataFrame,
@@ -161,6 +162,22 @@ def test_superkey(
 
 def test_superkey_default_over(basic_df: pd.DataFrame) -> None:
     assert Superkey(Meta("cols")).check_with_context(basic_df, {"cols": ["a"]}) is None
+
+
+@pytest.mark.parametrize(
+    "qualifier, cols_expr, context, expected",
+    [("all", "cols", {"cols": ["a", "b"]}, True)],
+)
+def test_notna(
+    basic_df: pd.DataFrame,
+    qualifier: str,
+    cols_expr: str,
+    context: Dict[str, Any],
+    expected: bool,
+) -> None:
+    assert (
+        Notna(qualifier, Meta(cols_expr)).check_with_context(basic_df, context) is None
+    )
 
 
 @pytest.mark.parametrize("prop", [Cols("all", "a"), Cols("all", "not_a_column")])
