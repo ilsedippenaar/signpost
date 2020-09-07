@@ -220,6 +220,11 @@ def test_schema(
         ("better_types_df", "just", {"c": [pd.NA, True, False]}, True),
         # missing columns
         ("basic_df", "all", {"z": [1, 2]}, False),
+        # value interactions
+        ("basic_df", "all", {"a": [1, 2], "b": ["foo", "bar"]}, True),
+        ("basic_df", "any", {"a": [1, -1], "b": ["foo", "bar"]}, True),
+        ("basic_df", "none", {"a": [1, -1], "b": ["foo", "bar"]}, False),
+        ("basic_df", "none", {"a": [1, -1], "b": ["not_foo", "bar"]}, True),
     ],
     indirect=["df"],
 )
