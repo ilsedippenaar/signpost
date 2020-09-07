@@ -1,11 +1,12 @@
-from typing import Any, Collection, Dict, Hashable, Optional
+import itertools
+from typing import Any, Collection, Dict, Hashable, Optional, Set, cast
 
 import numpy as np
 import pandas as pd
 import pytest
 from _pytest.fixtures import SubRequest
 
-from signpost import Cols, Notna, Schema, Superkey, Values
+from signpost import Cols, MergeResult, Notna, Schema, Superkey, Values
 from signpost import properties as props
 
 
@@ -46,8 +47,40 @@ def keys_df() -> pd.DataFrame:
 
 
 @pytest.fixture
+def left_df() -> pd.DataFrame:
+    return pd.DataFrame({"a": [1, 2, 3], "b": [4, 5, 6]})
+
+
+@pytest.fixture
+def right_df() -> pd.DataFrame:
+    return pd.DataFrame({"a": [2, 3, 4], "c": [7, 8, 9]})
+
+
+@pytest.fixture
 def df(request: SubRequest) -> pd.DataFrame:
     return request.getfixturevalue(request.param)
+
+
+@pytest.fixture(params=["inner", "left", "right", "outer"])
+def merge_how(request: SubRequest) -> str:
+    return cast(str, request.param)
+
+
+@pytest.fixture(
+    params=[
+        # power set, excluding empty set
+        c
+        for i in range(1, 4)
+        for c in itertools.combinations(["both", "left_only", "right_only"], i)
+    ]
+)
+def merge_results(request: SubRequest) -> Set[str]:
+    return set(request.param)
+
+
+@pytest.fixture(params=["_merge", "a_very_very_very_long_column_name", "_"])
+def indicator_col(request: SubRequest) -> str:
+    return cast(str, request.param)
 
 
 @pytest.mark.parametrize(
@@ -260,3 +293,24 @@ def test_notna(
     df: pd.DataFrame, qualifier: str, cols: props.ColsType, expected: bool
 ) -> None:
     assert (Notna.Checker(qualifier, cols).check(df) is None) == expected
+
+
+def test_merge_result(
+    left_df: pd.DataFrame,
+    right_df: pd.DataFrame,
+    merge_how: str,
+    merge_results: Set[str],
+    indicator_col: str,
+) -> None:
+    expected = {
+        "inner": {"both"},
+        "left": {"both", "left_only"},
+        "right": {"both", "right_only"},
+        "outer": {"both", "left_only", "right_only"},
+    }[merge_how] == merge_results
+    assert (
+        MergeResult.Checker(merge_results, indicator_col=indicator_col).check(
+            pd.merge(left_df, right_df, how=merge_how, indicator=indicator_col)
+        )
+        is None
+    ) == expected

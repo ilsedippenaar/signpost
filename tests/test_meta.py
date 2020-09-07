@@ -9,6 +9,7 @@ from signpost import (
     Assume,
     Cols,
     Function,
+    MergeResult,
     Meta,
     Notna,
     Or,
@@ -185,3 +186,22 @@ def test_assume(
     basic_df: pd.DataFrame, prop: Union[props.Property, props.ContextProperty],
 ) -> None:
     assert Assume(prop).check_with_context(basic_df, {}) is None
+
+
+def test_merge_result() -> None:
+    assert (
+        MergeResult(Meta("results"), Meta("col")).check_with_context(
+            pd.DataFrame({"merge_result": ["both"]}),
+            {"results": ["both"], "col": "merge_result"},
+        )
+        is None
+    )
+
+
+def test_merge_result_default_indicator_col() -> None:
+    assert (
+        MergeResult(Meta("results")).check_with_context(
+            pd.DataFrame({"_merge": ["both"]}), {"results": ["both"]},
+        )
+        is None
+    )

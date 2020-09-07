@@ -8,6 +8,7 @@ from typing import (
     Dict,
     Generic,
     Hashable,
+    List,
     Mapping,
     Optional,
     Set,
@@ -383,6 +384,37 @@ class Notna(ContextProperty):
         return self.Checker(self.qualifier.get(context), self.cols.get(context)).check(
             df
         )
+
+
+class MergeResult(ContextProperty):
+    class Checker(Property):
+        def __init__(
+            self,
+            merge_results: utils.Wrappable[str],
+            indicator_col: Hashable = "_merge",
+        ):
+            self.results: List[str] = utils.wrap(merge_results)
+            self.col = indicator_col
+
+        def check(self, df: pd.DataFrame) -> Optional[str]:
+            return Values.Checker(Qualifier.JUST, {self.col: self.results}).check(df)
+
+    def __init__(
+        self,
+        merge_results: MetaVar[utils.Wrappable[str]],
+        indicator_col: MetaVar[Hashable] = "_merge",
+    ):
+        self.results: Param[utils.Wrappable[str], List[str]] = Param(
+            merge_results, lambda x: utils.wrap(x)
+        )
+        self.col = Param(indicator_col, lambda x: x)
+
+    def check_with_context(
+        self, df: pd.DataFrame, context: Dict[str, Any]
+    ) -> Optional[str]:
+        return self.Checker(
+            merge_results=self.results.get(context), indicator_col=self.col.get(context)
+        ).check(df)
 
 
 class Function(ContextProperty):
