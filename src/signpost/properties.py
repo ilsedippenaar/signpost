@@ -228,8 +228,12 @@ class Values(ContextProperty):
             self.qualifier = Qualifier(qualifier)
             self.values = values
 
-        def _raw_check(self, df: pd.DataFrame) -> bool:
-            return QualifierEvaluator(
+        def check(self, df: pd.DataFrame) -> Optional[str]:
+            col_check = Cols.Checker("all", list(self.values)).check(df)
+            if col_check is not None:
+                return col_check
+
+            evaluator = QualifierEvaluator(
                 self.qualifier,
                 reference=df.loc[:, self.values].drop_duplicates(),
                 comparison=(
@@ -237,17 +241,11 @@ class Values(ContextProperty):
                     .astype(df.dtypes[self.values])
                     .drop_duplicates()
                 ),
-            ).eval()
-
-        def check(self, df: pd.DataFrame) -> Optional[str]:
-            col_check = Cols.Checker("all", list(self.values)).check(df)
-            if col_check is not None:
-                return col_check
-
-            if not self._raw_check(df):
+            )
+            if not evaluator.eval():
                 return (
-                    f"Expected {self.qualifier.value} values:\n{self.values}\n"
-                    f"Found:\n{df[self.values].drop_duplicates()}"
+                    f"Expected {self.qualifier.value} values:\n{evaluator.comparison}\n"
+                    f"Found:\n{evaluator.reference}"
                 )
             return None
 
