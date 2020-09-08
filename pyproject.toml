@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "signpost"
-version = "0.1.0"
+version = "0.2.0"
 description = "Simple decorators and functions for type checking pandas DataFrames at runtime"
 repository = "https://github.com/ilsedippenaar/signpost"
 license = "GPL-3.0-only"
