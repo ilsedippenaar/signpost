@@ -9,6 +9,27 @@ are expected before execution of a function begins, we can catch errors
 earlier with a message that makes sense and also document the inputs and
 outputs of functions more concisely.
 
+This project is related to a number of others that all share similar goals.
+While perhaps stumbling straight headlong the Lisp curse, signpost is yet
+another pandas validation library. Here is a list of other similar projects:
+
+* `Bulwark <https://github.com/zaxr/bulwark>`_
+* `pandera <https://github.com/pandera-dev/pandera>`_
+* `Table Enforcer <https://github.com/xguse/table_enforcer>`_
+* `pandas-validation <https://github.com/jmenglund/pandas-validation>`_
+* `PandasSchema <https://github.com/TMiguelT/PandasSchema>`_
+* `Opulent-Pandas <https://github.com/danielvdende/opulent-pandas>`_
+
+So why reinvent the wheel? Signpost offers a few advantages:
+
+#. Support for delayed evaluation of property inputs through the use of ``Meta``.
+   This technique works especially well in settings where class variables may hold information
+   about the data being operated on by the class.
+#. Qualifiers allow for richer and more flexible descriptions of data
+#. Straightforward approach to function decorators that uses the same logic as Python itself
+   to match properties to DataFrames
+#. Strict Python type checking via mypy
+
 
 Example Usage
 -------------
@@ -23,7 +44,7 @@ as well as qualify them using "all", "any", "just", or "none".
     from signpost import Cols, Schema, Values, Superkey, And, df_args, df_return
 
     @df_args(
-        And(Cols("all", ["thing_1", 2]), Superkey(["thing_1"], over=[2])),
+        Cols("all", ["thing_1", 2]) & Superkey("thing_1", over=2),
         other=Schema("just", {"thing_2": int, "thing_3": "string"})
     )
     @df_return(
@@ -34,7 +55,7 @@ as well as qualify them using "all", "any", "just", or "none".
             Values("none", {"thing_1": [3]}),
         )
     )
-    def do_a_thing(df: pd.DataFrame, other: pd.DataFrame) -> (int, pd.DataFrame):
+    def do_a_thing(df: pd.DataFrame, other: pd.DataFrame) -> Tuple[int, pd.DataFrame]:
         ...
 
 However, there are times when the particular properties of a data frame depend on other
@@ -53,7 +74,7 @@ For example, we can implement a checked "project" function
 
     @df_args(Cols("all", Meta("cols")))
     @df_return(Cols("just", Meta("cols")))
-    def project(df: pd.DataFrame, cols: List[str]):
+    def project(df: pd.DataFrame, cols: List[str]) -> pd.DataFrame:
         return df.loc[:, cols].drop_duplicates()
 
 Since the expressions passed to these meta properties can be arbitrary Python strings,
@@ -68,6 +89,62 @@ since pandas DataFrames are dict-like, we can treat them as sequences of column 
     @df_return(Cols("just", Meta("set(left) | set(other)"))
     def merge(left, right):
         return pd.merge(left, right)
+
+Other use cases
+^^^^^^^^^^^^^^^
+For usage inside scripts, it is useful to use the ``Checker`` inner class for various properties.
+For example,
+
+.. code-block:: python
+
+    from signpost import Cols, Values
+
+    df = pd.read_csv("my_file.csv")
+    df = Cols.Checker("just", ["col_a", "col_b"]).validate(df)
+    df = Values.Checker("all", {"col_a": [1, 2], "col_b": [1, 1]}).validate(df)
+
+When combined with ``pd.DataFrame.pipe``, ``validate`` can provide expressive sanity checking.
+If you would like more custom handling, you can use the ``check`` method as follows:
+
+.. code-block:: python
+
+    from signpost import Cols
+
+    df = ...
+    error: Optional[str] = Cols.Checker("just", ["col_a", "col_b"]).check(df)
+    if error is not None:
+        print(error)
+        # more handling
+        ...
+
+
+List of Properties
+------------------
+
+* Cols: checks that the specified columns are in the data
+* Schema: checks whether the specified column / data type pairs match the data
+* Values: enforces which values (and combinations of values) need to be present in the data
+* Superkey: checks that the specified columns uniquely identify the data
+* Notna: enforces that the specified columns do not contain NA / missing values
+* MergeResult: checks whether a merge was a inner, left, or right join
+* Bounded: enforces that the values in the specified columns fall between two (potentially unbounded) values
+
+Special properties
+^^^^^^^^^^^^^^^^^^
+* Function: wraps a bare function into a property, useful for quick checks
+* And: combines two properties into a new property that checks each in turn, stopping if an error is found
+* Or: combines two properties into a new property that checks each in turn, stopping once a property succeeds
+* Assume: wraps a property to always be true, useful for documenting a property without doing unnecessary computation
+
+
+Installation
+------------
+
+Installation is easy! Just type:
+
+.. code-block:: console
+
+    pip install signpost
 
 Extending signpost
 ------------------
@@ -87,14 +164,6 @@ It is also possible to create new ``Property``'s simply by implementing the ``Pr
 or ``ContextProperty`` interface found in ``signpost.properties``.
 
 
-TODO
-----
-There are a couple of improvements to be made, namely
-
-1. **Ergonomics.** Assume bare types to be single-element lists.
-
-2. **Documentation.**
-
 .. |pypi-version| image:: https://img.shields.io/pypi/v/signpost
     :alt: PyPI
     :target: https://pypi.org/project/signpost
@@ -103,10 +172,10 @@ There are a couple of improvements to be made, namely
     :alt: PyPI - Python Version
     :target: https://pypi.org/project/signpost
 
-.. |build-status| image:: https://travis-ci.com/ilsedippenaar/signpost.svg?branch=master
+.. |build-status| image:: https://travis-ci.com/ilsedippenaar/signpost.svg?branch=main
     :alt: Build Status
     :target: https://travis-ci.com/ilsedippenaar/signpost
 
-.. |coverage| image:: https://codecov.io/gh/ilsedippenaar/signpost/branch/master/graph/badge.svg
+.. |coverage| image:: https://codecov.io/gh/ilsedippenaar/signpost/branch/main/graph/badge.svg
     :alt: Code Coverage
     :target: https://codecov.io/gh/ilsedippenaar/signpost

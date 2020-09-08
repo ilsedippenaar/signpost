@@ -1,11 +1,20 @@
-from typing import Any, Collection, Dict, Hashable, Optional
+import itertools
+from typing import Any, Collection, Dict, Hashable, Optional, Set, cast
 
 import numpy as np
 import pandas as pd
 import pytest
 from _pytest.fixtures import SubRequest
 
-from signpost import Cols, Meta, Schema, Superkey, Values
+from signpost import (
+    Bounded,
+    Cols,
+    MergeResult,
+    Notna,
+    Schema,
+    Superkey,
+    Values,
+)
 from signpost import properties as props
 
 
@@ -46,28 +55,74 @@ def keys_df() -> pd.DataFrame:
 
 
 @pytest.fixture
+def left_df() -> pd.DataFrame:
+    return pd.DataFrame({"a": [1, 2, 3], "b": [4, 5, 6]})
+
+
+@pytest.fixture
+def right_df() -> pd.DataFrame:
+    return pd.DataFrame({"a": [2, 3, 4], "c": [7, 8, 9]})
+
+
+@pytest.fixture
 def df(request: SubRequest) -> pd.DataFrame:
     return request.getfixturevalue(request.param)
+
+
+@pytest.fixture(params=["inner", "left", "right", "outer"])
+def merge_how(request: SubRequest) -> str:
+    return cast(str, request.param)
+
+
+@pytest.fixture(
+    params=[
+        # power set, excluding empty set
+        c
+        for i in range(1, 4)
+        for c in itertools.combinations(["both", "left_only", "right_only"], i)
+    ]
+)
+def merge_results(request: SubRequest) -> Set[str]:
+    return set(request.param)
+
+
+@pytest.fixture(params=["_merge", "a_very_very_very_long_column_name", "_"])
+def indicator_col(request: SubRequest) -> str:
+    return cast(str, request.param)
+
+
+@pytest.mark.parametrize(
+    "cols",
+    [
+        "a",
+        pytest.param(
+            "foobar",
+            marks=pytest.mark.xfail(raises=props.DataFrameTypeError, strict=True),
+        ),
+    ],
+)
+def test_property_validate(basic_df: pd.DataFrame, cols: props.ColsType) -> None:
+    assert Cols.Checker("all", cols).validate(basic_df).equals(basic_df)
 
 
 @pytest.mark.parametrize(
     "qualifier, cols, expected",
     [
-        ("all", ["a"], True),
+        ("all", "a", True),
         ("all", ["a", "b"], True),
         ("all", ["a", "b", "c"], False),
         ("all", [], True),
-        ("any", ["a"], True),
+        ("any", "a", True),
         ("any", ["a", "b"], True),
         ("any", ["a", "b", "c"], True),
         ("any", [], False),
-        ("none", ["c"], True),
+        ("none", "c", True),
         ("none", ["c", "d"], True),
         ("none", ["a", "c"], False),
         ("none", [], True),
         ("just", ["a", "b"], True),
-        ("just", ["a"], False),
-        ("just", ["b"], False),
+        ("just", "a", False),
+        ("just", "b", False),
         ("just", [], False),
     ],
 )
@@ -187,6 +242,11 @@ def test_schema(
         ("better_types_df", "just", {"c": [pd.NA, True, False]}, True),
         # missing columns
         ("basic_df", "all", {"z": [1, 2]}, False),
+        # value interactions
+        ("basic_df", "all", {"a": [1, 2], "b": ["foo", "bar"]}, True),
+        ("basic_df", "any", {"a": [1, -1], "b": ["foo", "bar"]}, True),
+        ("basic_df", "none", {"a": [1, -1], "b": ["foo", "bar"]}, False),
+        ("basic_df", "none", {"a": [1, -1], "b": ["not_foo", "bar"]}, True),
     ],
     indirect=["df"],
 )
@@ -202,23 +262,23 @@ def test_values(
 @pytest.mark.parametrize(
     "cols, over, expected",
     [
-        (["a"], None, True),
-        (["b"], None, False),
-        (["d"], None, True),  # NaNs are counted as values
-        (["e"], None, False),  # duplicate NaNs are counted as duplicates
-        (["a"], ["b"], True),
-        (["a"], ["b", "c"], True),
-        (["b"], ["c"], True),
-        (["b"], ["a"], False),
-        (["b"], ["e"], False),
-        (["b"], ["c", "e"], False),
-        (["c"], ["b"], True),  # reverse of b and c above
-        (["d"], ["a"], True),  # NaNs can be keys
+        ("a", None, True),
+        ("b", None, False),
+        ("d", None, True),  # NaNs are counted as values
+        ("e", None, False),  # duplicate NaNs are counted as duplicates
+        ("a", "b", True),
+        ("a", ["b", "c"], True),
+        ("b", "c", True),
+        ("b", "a", False),
+        ("b", "e", False),
+        ("b", ["c", "e"], False),
+        ("c", "b", True),  # reverse of b and c above
+        ("d", "a", True),  # NaNs can be keys
         ([], None, False),  # empty list is not a superkey
         # missing columns
-        (["z"], [], False),
-        (["a"], ["z"], False),
-        (["x"], ["y", "z"], False),
+        ("z", [], False),
+        ("a", "z", False),
+        ("x", ["y", "z"], False),
     ],
 )
 def test_superkey(
@@ -228,3 +288,119 @@ def test_superkey(
     expected: bool,
 ) -> None:
     assert (Superkey.Checker(cols, over=over).check(keys_df) is None) == expected
+
+
+@pytest.mark.parametrize(
+    "df, qualifier, cols, expected",
+    [
+        ("types_df", "all", "a", True),
+        ("types_df", "all", "c", False),
+        ("types_df", "all", ["a", "b", "g"], True),
+        ("types_df", "all", ["a", "c"], False),
+        ("types_df", "all", ["a", "z"], False),
+        ("types_df", "any", "a", True),
+        ("types_df", "any", "c", False),
+        ("types_df", "any", ["a", "b", "g"], True),
+        ("types_df", "any", ["a", "c"], True),
+        ("types_df", "any", ["a", "z"], False),
+        ("types_df", "just", "a", False),
+        ("types_df", "just", "c", False),
+        ("types_df", "just", ["a", "b", "g"], True),
+        ("types_df", "just", ["a", "c"], False),
+        ("types_df", "just", ["a", "z"], False),
+        ("types_df", "none", "a", False),
+        ("types_df", "none", "c", True),
+        ("types_df", "none", ["a", "b", "g"], False),
+        ("types_df", "none", ["a", "c"], False),
+        ("types_df", "none", ["a", "z"], False),
+    ],
+    indirect=["df"],
+)
+def test_notna(
+    df: pd.DataFrame, qualifier: str, cols: props.ColsType, expected: bool
+) -> None:
+    assert (Notna.Checker(qualifier, cols).check(df) is None) == expected
+
+
+def test_merge_result(
+    left_df: pd.DataFrame,
+    right_df: pd.DataFrame,
+    merge_how: str,
+    merge_results: Set[str],
+    indicator_col: str,
+) -> None:
+    expected = {
+        "inner": {"both"},
+        "left": {"both", "left_only"},
+        "right": {"both", "right_only"},
+        "outer": {"both", "left_only", "right_only"},
+    }[merge_how] == merge_results
+    assert (
+        MergeResult.Checker(merge_results, indicator_col=indicator_col).check(
+            pd.merge(left_df, right_df, how=merge_how, indicator=indicator_col)
+        )
+        is None
+    ) == expected
+
+
+@pytest.mark.parametrize(
+    "cols, lower, upper, closed, expected",
+    [
+        ("a", 0, 4, "both", True),
+        ("a", 1, 4, "both", True),
+        ("a", 1, 3, "both", True),
+        ("a", 1, 3, "left", False),
+        ("a", 1, 3, "right", False),
+        ("a", 1, 3, "neither", False),
+        ("b", "x", "z", "both", True),
+        (["a", "g"], 0, 4, "neither", True),
+        # NA is treated as False
+        ("e", -100, 100, "both", False),
+        (["a", "e"], -100, 100, "both", False),
+        # unbounded
+        ("a", None, 4, "right", True),
+        ("a", 0, None, "left", True),
+        ("a", None, None, "neither", True),
+        # NA not checked in double unbounded case
+        (["a", "e"], None, None, "neither", True),
+        # missing columns
+        (["a", "foobar"], 0, 4, "both", False),
+        # malformed interval
+        pytest.param(
+            "a",
+            4,
+            3,
+            "both",
+            True,
+            marks=pytest.mark.xfail(raises=ValueError, strict=True),
+        ),
+        # bounded constraints
+        pytest.param(
+            "a",
+            None,
+            3,
+            "both",
+            True,
+            marks=pytest.mark.xfail(raises=ValueError, strict=True),
+        ),
+        pytest.param(
+            "a",
+            1,
+            None,
+            "right",
+            True,
+            marks=pytest.mark.xfail(raises=ValueError, strict=True),
+        ),
+    ],
+)
+def test_bounded(
+    types_df: pd.DataFrame,
+    cols: props.ColsType,
+    lower: Any,
+    upper: Any,
+    closed: str,
+    expected: bool,
+) -> None:
+    assert (
+        Bounded.Checker(cols, lower, upper, closed,).check(types_df) is None
+    ) == expected

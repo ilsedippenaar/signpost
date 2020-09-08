@@ -1,9 +1,23 @@
-from typing import Any, Callable, Collection, Dict, Optional
+import functools
+from typing import Any, Callable, Collection, Dict, Optional, Union, cast
 
 import pandas as pd
 import pytest
 
-from signpost import And, Cols, Function, Meta, Or, Schema, Superkey, Values
+from signpost import (
+    And,
+    Assume,
+    Bounded,
+    Cols,
+    Function,
+    MergeResult,
+    Meta,
+    Notna,
+    Or,
+    Schema,
+    Superkey,
+    Values,
+)
 from signpost import properties as props
 
 
@@ -32,14 +46,22 @@ def test_function(
         ([Cols("all", ["c"]), Schema("all", {"a": int})], False),
         ([Cols("all", ["a"]), Schema("all", {"a": float})], False),
         ([Cols("all", ["a"]), Schema("all", {"a": int})], True),
+        ([Cols.Checker("all", ["a"]), Schema.Checker("all", {"a": int})], True),
         ([Cols("any", ["a"])], True),
         ([], True),
     ],
 )
 def test_and(
-    basic_df: pd.DataFrame, properties: Collection[props.Property], expected: bool,
+    basic_df: pd.DataFrame,
+    properties: Collection[Union[props.Property, props.ContextProperty]],
+    expected: bool,
 ) -> None:
-    assert (And(*properties).check_with_context(basic_df, {}) is None) == expected
+    result = And(*properties).check_with_context(basic_df, {})
+    assert (result is None) == expected
+    if properties:
+        # type checker isn't smart enough to realize this produces an And object
+        prop = cast(And, functools.reduce(lambda x, y: x & y, properties))
+        assert prop.check_with_context(basic_df, {}) == result
 
 
 @pytest.mark.parametrize(
@@ -49,14 +71,21 @@ def test_and(
         ([Cols("all", ["c"]), Schema("all", {"a": int})], True),
         ([Cols("all", ["a"]), Schema("all", {"a": float})], True),
         ([Cols("all", ["a"]), Schema("all", {"a": int})], True),
+        ([Cols.Checker("all", ["a"]), Schema.Checker("all", {"a": int})], True),
         ([Cols("any", ["a"])], True),
         ([], False),
     ],
 )
 def test_or(
-    basic_df: pd.DataFrame, properties: Collection[props.Property], expected: bool,
+    basic_df: pd.DataFrame,
+    properties: Collection[Union[props.Property, props.ContextProperty]],
+    expected: bool,
 ) -> None:
-    assert (Or(*properties).check_with_context(basic_df, {}) is None) == expected
+    result = Or(*properties).check_with_context(basic_df, {})
+    assert (result is None) == expected
+    if properties:
+        prop = cast(Or, functools.reduce(lambda x, y: x | y, properties))
+        assert prop.check_with_context(basic_df, {}) == result
 
 
 @pytest.mark.parametrize(
@@ -81,7 +110,7 @@ def test_cols(
 
 @pytest.mark.parametrize(
     "qualifier,values_expr,context,expected",
-    [("all", "{c: [1] for c in cols}", {"cols": ["a"]}, True),],
+    [("all", "{c: [1] for c in cols}", {"cols": ["a"]}, True)],
 )
 def test_values(
     basic_df: pd.DataFrame,
@@ -98,7 +127,7 @@ def test_values(
 
 @pytest.mark.parametrize(
     "qualifier,schema_expr,context,expected",
-    [("all", "{c: int for c in cols}", {"cols": ["a"]}, True),],
+    [("all", "{c: int for c in cols}", {"cols": ["a"]}, True)],
 )
 def test_schema(
     basic_df: pd.DataFrame,
@@ -135,3 +164,68 @@ def test_superkey(
 
 def test_superkey_default_over(basic_df: pd.DataFrame) -> None:
     assert Superkey(Meta("cols")).check_with_context(basic_df, {"cols": ["a"]}) is None
+
+
+@pytest.mark.parametrize(
+    "qualifier, cols_expr, context, expected",
+    [("all", "cols", {"cols": ["a", "b"]}, True)],
+)
+def test_notna(
+    basic_df: pd.DataFrame,
+    qualifier: str,
+    cols_expr: str,
+    context: Dict[str, Any],
+    expected: bool,
+) -> None:
+    assert (
+        Notna(qualifier, Meta(cols_expr)).check_with_context(basic_df, context) is None
+    )
+
+
+@pytest.mark.parametrize("prop", [Cols("all", "a"), Cols("all", "not_a_column")])
+def test_assume(
+    basic_df: pd.DataFrame, prop: Union[props.Property, props.ContextProperty],
+) -> None:
+    assert Assume(prop).check_with_context(basic_df, {}) is None
+
+
+def test_merge_result() -> None:
+    assert (
+        MergeResult(Meta("results"), Meta("col")).check_with_context(
+            pd.DataFrame({"merge_result": ["both"]}),
+            {"results": ["both"], "col": "merge_result"},
+        )
+        is None
+    )
+
+
+def test_merge_result_default_indicator_col() -> None:
+    assert (
+        MergeResult(Meta("results")).check_with_context(
+            pd.DataFrame({"_merge": ["both"]}), {"results": ["both"]},
+        )
+        is None
+    )
+
+
+@pytest.mark.parametrize(
+    "col_expr, lower_expr, upper_expr, closed_expr, context",
+    [
+        ("col", "1", "4", "'both'", {"col": "a"}),
+        ("col", "lower", "4", "'right'", {"col": "a", "lower": None}),
+    ],
+)
+def test_bounded(
+    basic_df: pd.DataFrame,
+    col_expr: str,
+    lower_expr: str,
+    upper_expr: str,
+    closed_expr: str,
+    context: Dict[str, Any],
+) -> None:
+    assert (
+        Bounded(
+            Meta(col_expr), Meta(lower_expr), Meta(upper_expr), Meta(closed_expr)
+        ).check_with_context(basic_df, context=context)
+        is None
+    )

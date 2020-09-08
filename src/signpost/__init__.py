@@ -1,5 +1,18 @@
 from .decorators import df_args, df_return
-from .properties import And, Cols, Function, Meta, Or, Schema, Superkey, Values
+from .properties import (
+    And,
+    Assume,
+    Bounded,
+    Cols,
+    Function,
+    MergeResult,
+    Meta,
+    Notna,
+    Or,
+    Schema,
+    Superkey,
+    Values,
+)
 
 __all__ = [
     "df_args",
@@ -8,6 +21,10 @@ __all__ = [
     "Schema",
     "Superkey",
     "Values",
+    "Assume",
+    "Notna",
+    "MergeResult",
+    "Bounded",
     "Function",
     "And",
     "Or",
