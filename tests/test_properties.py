@@ -92,6 +92,20 @@ def indicator_col(request: SubRequest) -> str:
 
 
 @pytest.mark.parametrize(
+    "cols",
+    [
+        "a",
+        pytest.param(
+            "foobar",
+            marks=pytest.mark.xfail(raises=props.DataFrameTypeError, strict=True),
+        ),
+    ],
+)
+def test_property_validate(basic_df: pd.DataFrame, cols: props.ColsType) -> None:
+    assert Cols.Checker("all", cols).validate(basic_df).equals(basic_df)
+
+
+@pytest.mark.parametrize(
     "qualifier, cols, expected",
     [
         ("all", "a", True),

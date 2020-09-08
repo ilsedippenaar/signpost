@@ -46,6 +46,12 @@ class Property:
     def check(self, df: pd.DataFrame) -> Optional[str]:
         raise NotImplementedError
 
+    def validate(self, df: pd.DataFrame) -> pd.DataFrame:
+        result = self.check(df)
+        if result is not None:
+            raise DataFrameTypeError(result)
+        return df
+
     def __and__(self, other: object) -> "And":
         if not isinstance(other, (Property, ContextProperty)):
             raise TypeError(f"And operation not supported between {self} and {other}")
